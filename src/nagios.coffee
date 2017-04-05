@@ -52,7 +52,7 @@ module.exports = (robot) ->
   robot.respond /nagios(NULL|(.*))/i, (msg) ->
     hubot_user = msg['message']['user']['name']
     words = msg.match[1]
-    input = words.split(' ');
+    input = splitArgs(words);
     if words.length < 1
       cmd = 'help' 
     else
@@ -124,16 +124,17 @@ module.exports = (robot) ->
           msg.send "Usage: nagios #{cmd} <host> [<service>]"
         else
            host = input[0]
-           service = input[1]
+           service = encodeURIComponent(input[1])
            if service 
               ct = 34
-              service = "&service=#{service}"
+              service = "service=#{service}"
            else
               ct = 33
               service = ""
-           comment = "hubot initiated ack for #{hubot_user}"
+           comment = "#{hubot_user}: " + input[2] ? "acknowledged"
            call = "cmd.cgi"
-           data = "cmd_typ=#{ct}&host=#{host}#{service}&cmd_mod=2&sticky_ack=on&com_author=#{encodeURIComponent(hubot_user)}&send_notification=on&com_data=#{encodeURIComponent(comment)}"
+           data = "cmd_typ=#{ct}&host=#{host}&#{service}&cmd_mod=2&sticky_ack=on&com_author=#{encodeURIComponent(hubot_user)}&send_notification=on&com_data=#{encodeURIComponent(comment)}"
+           console.log data
            nagios_post msg, auth, call, data, (res) ->
              if res.match(/successfully submitted/)
                msg.send "Your acknowledgement was received by nagios"
@@ -244,6 +245,21 @@ nagios_post = (msg, auth, call, post, cb) ->
     .header('User-Agent', "Hubot/#{@version}")
     .post(post) (err, res, body) ->
       cb body
+
+splitArgs = (line) ->
+  args = []
+  while line.length > 0
+    if line[0] == '\''
+      arg = line.split('\'')[1]
+      line = line.slice(arg.length+3).trim()
+    else if line[0] == '\"'
+      arg = line.split('\"')[1]
+      line = line.slice(arg.length+3).trim()
+    else
+      arg = line.split(' ')[0]
+      line = line.slice(arg.length+1).trim()
+    args.push arg.trim()
+  return args
 
 host_service_parse = (html, type, match, cb) ->
   entities = new Entities()
